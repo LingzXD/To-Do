@@ -1,1 +1,0 @@
-print("my_name:John Doe")
