@@ -8,6 +8,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import TextIO
 
+from _storage_refs import _protect_task_save
+
 
 Task = dict[str, object]
 PathLike = str | os.PathLike[str]
@@ -213,8 +215,13 @@ def initialize_storage(filepath: PathLike = DEFAULT_TASKS_PATH) -> None:
     except FileExistsError:
         _read_path(path)
     else:
-        with stream:
-            _write_stream([], stream)
+        try:
+            with stream:
+                _write_stream([], stream)
+        except (OSError, UnicodeError, csv.Error):
+            # Only this call's exclusively created file may be removed.
+            path.unlink(missing_ok=True)
+            raise
 
 
 def load_tasks(filepath: PathLike = DEFAULT_TASKS_PATH) -> list[Task]:
@@ -237,9 +244,13 @@ def save_tasks(tasks: list[Task], filepath: PathLike = DEFAULT_TASKS_PATH) -> No
     or OSError/UnicodeError for write failures. A failed write/replace preserves
     the old target and cleans up the temporary file where possible. This is
     single-user storage, without multi-process locking or database transactions.
+    When sibling V2 reference CSVs exist, also reject dangling category, subtask
+    or tag references. V2 datasets use the canonical tasks.csv filename.
     """
     validate_tasks(tasks)
-    _atomic_write(tasks, Path(filepath))
+    path = Path(filepath)
+    _protect_task_save(tasks, path)
+    _atomic_write(tasks, path)
 
 
 def import_tasks(
