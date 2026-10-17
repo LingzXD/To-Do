@@ -218,3 +218,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ClearTask local data and editor settings
+.venv/
+*.pyc
+.idea/
+.vscode/
+data/*.csv
+.cleartask-*.tmp
+.cleartask-*.bak
