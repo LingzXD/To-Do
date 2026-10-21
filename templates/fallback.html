@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>待办清单</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #202533; }
+    h1 { margin-bottom: .25rem; }
+    .summary { color: #596579; margin-top: 0; }
+    .notice { padding: .7rem 1rem; background: #e8f5ed; border-radius: .4rem; }
+    .error { padding: .7rem 1rem; background: #ffe8e8; border-radius: .4rem; }
+    form { display: inline-block; margin: .2rem 0; }
+    input, select, button { font: inherit; padding: .35rem .5rem; }
+    button { cursor: pointer; }
+    .task { border: 1px solid #dbe1e8; border-radius: .5rem; margin: .6rem 0; padding: .75rem; }
+    .task.done .title { text-decoration: line-through; color: #697386; }
+    .meta { color: #596579; font-size: .9rem; }
+    .controls { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+    section { margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <h1>待办清单</h1>
+  <p class="summary">共 {{ stats.total }} 项 · 待完成 {{ stats.pending }} 项 · 已完成 {{ stats.completed }} 项 · 完成率 {{ stats.rate }}%</p>
+  {% for message in get_flashed_messages() %}<p class="notice">{{ message }}</p>{% endfor %}
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+  <section>
+    <h2>添加任务</h2>
+    <form action="{{ url_for('add') }}" method="post">
+      <input name="title" aria-label="任务标题" placeholder="任务标题" required>
+      <input name="description" aria-label="描述" placeholder="描述（可选）">
+      <select name="priority" aria-label="优先级">
+        <option value="medium">中优先级</option><option value="high">高优先级</option><option value="low">低优先级</option>
+      </select>
+      <input name="due_at" type="date" aria-label="截止日期">
+      <button type="submit">添加</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>任务</h2>
+    <form action="{{ url_for('index') }}" method="get">
+      <label>状态 <select name="status">
+        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>全部</option>
+        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>待完成</option>
+        <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>已完成</option>
+      </select></label>
+      <label>排序 <select name="sort">
+        <option value="priority" {% if sort_by == 'priority' %}selected{% endif %}>优先级</option>
+        <option value="due" {% if sort_by == 'due' %}selected{% endif %}>截止日期</option>
+        <option value="created" {% if sort_by == 'created' %}selected{% endif %}>创建时间</option>
+      </select></label>
+      <button type="submit">应用</button>
+    </form>
+    {% for task in tasks %}
+      <article class="task {% if task.completed %}done{% endif %}">
+        <strong class="title">{{ task.title }}</strong>
+        {% if task.description %}<p>{{ task.description }}</p>{% endif %}
+        <p class="meta">{{ '已完成' if task.completed else '待完成' }} · 优先级 {{ task.priority }}{% if task.due_at %} · 截止 {{ task.due_at }}{% endif %}</p>
+        <div class="controls">
+          {% if not task.completed %}<form action="{{ url_for('complete', task_id=task.id) }}" method="post"><button type="submit">完成</button></form>{% endif %}
+          <form action="{{ url_for('priority', task_id=task.id) }}" method="post">
+            <select name="priority" aria-label="修改 {{ task.title }} 的优先级">
+              {% for value, label in [('high', '高'), ('medium', '中'), ('low', '低')] %}
+                <option value="{{ value }}" {% if task.priority == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit">修改优先级</button>
+          </form>
+          <form action="{{ url_for('delete', task_id=task.id) }}" method="post"><button type="submit">删除</button></form>
+        </div>
+      </article>
+    {% else %}<p>这里还没有任务。</p>{% endfor %}
+  </section>
+
+  <section>
+    <h2>CSV 导入与导出</h2>
+    <p><a href="{{ url_for('export') }}">下载任务 CSV</a></p>
+    <form action="{{ url_for('import_csv') }}" method="post" enctype="multipart/form-data">
+      <input type="file" name="file" accept=".csv,text/csv" aria-label="CSV 文件" required>
+      <select name="mode" aria-label="导入方式"><option value="merge">合并</option><option value="replace">替换现有任务</option></select>
+      <button type="submit">导入</button>
+    </form>
+    <p class="meta">CSV 必须符合仓库的 12 字段格式；合并导入时，重复 ID 会被拒绝。</p>
+  </section>
+</body>
+</html>
